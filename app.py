@@ -8,6 +8,9 @@ from langchain.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.llms import CTransformers
 from src.helper import *
+from flask import Flask, render_template, jsonify, request
+
+app =Flask(__name__)
 
 loader = DirectoryLoader('data/',
                     glob="*.pdf",
@@ -38,22 +41,31 @@ llm =CTransformers(model = 'model/llama-2-7b-chat.ggmlv3.q4_0.bin',
 
 qa_prompt = PromptTemplate(template=template, input_variables=['context','question'])
 
-# question_answer_chain = create_stuff_documents_chain(llm, qa_prompt)
-# chain = create_retrieval_chain(vector_store.as_retriever(search_kwargs={'k':2}), question_answer_chain)
-# chain = RetrievalQA.from_chain_type(llm=llm,
-#                                     chain_type='stuff',
-#                                     retriever = vector_store.as_retriever(search_kwargs={'k':2}),
-#                                     return_source_documents=True,
-#                                     chain_type_kwargs={'prompt':qa_prompt})
-qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff",
+chain = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff",
                                     retriever = vectorstore.as_retriever(search_kwargs={'k':2}),
                                     return_source_documents=False,
                                     chain_type_kwargs={'prompt':qa_prompt})
-user_input = "Tell me about rainfall measurement"
-
-result = qa.run({"query": user_input})
-
-print(f"Answer:{result}")
 
 
+
+@app.route('/', methods = ["GET","POST"])
+
+def index():
+    return render_template('index.html', **locals())
+
+@app.route('/chatbot', methods = ['GET','POST'])
+
+def chatbotResponse():
+
+    if request.method == 'POST':
+        user_input = request.form['question']
+        print(user_input)
+
+        result = chain({'query':user_input})
+        print(f"Answer:{result}")
+    
+    return jsonify({'response': str(result)})
+
+if __name__ =="__main__":
+    app.run(host='0.0.0.0',port = 8080, debug=True)
 
